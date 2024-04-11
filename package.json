@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "npx nodemon src/app.ts",
     "build": "tsc",
     "start": "node ./dist/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,6 +21,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "mysql": "^2.18.1"
+    "mysql": "^2.18.1",
+    "nodemon": "^3.1.0"
   }
 }

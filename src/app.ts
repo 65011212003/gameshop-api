@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import mysql, { Pool, MysqlError } from 'mysql';
+import mysql, { Pool, PoolConnection, QueryError } from 'mysql2/promise';
 
 const app = express();
 app.use(express.json());
@@ -15,24 +15,19 @@ const dbConfig = {
 const pool: Pool = mysql.createPool(dbConfig);
 
 // Helper function to execute MySQL queries
-function executeQuery(query: string, params: any[], callback: (err: MysqlError | null, result?: any) => void) {
-    pool.getConnection((err, connection) => {
-        if (err) {
-            console.error('Error getting database connection:', err);
-            callback(err);
-            return;
-        }
-
-        connection.query(query, params, (err, result) => {
+async function executeQuery(query: string, params: any[]): Promise<any> {
+    try {
+        const connection: PoolConnection = await pool.getConnection();
+        try {
+            const [result] = await connection.query(query, params);
+            return result;
+        } finally {
             connection.release();
-            if (err) {
-                console.error('Error executing query:', err);
-                callback(err);
-                return;
-            }
-            callback(null, result);
-        });
-    });
+        }
+    } catch (err) {
+        console.error('Error executing query:', err);
+        throw err;
+    }
 }
 
 // API routes
@@ -40,217 +35,201 @@ function executeQuery(query: string, params: any[], callback: (err: MysqlError |
 // Users
 
 // Create a new user
-app.post('/users', (req: Request, res: Response) => {
+app.post('/users', async (req: Request, res: Response) => {
     const { username, password, email, role } = req.body;
     const query = 'INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)';
-    executeQuery(query, [username, password, email, role], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.status(201).json({ id: result.insertId });
-        }
-    });
+    try {
+        const result = await executeQuery(query, [username, password, email, role]);
+        res.status(201).json({ id: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Get all users
-app.get('/users', (req: Request, res: Response) => {
+app.get('/users', async (req: Request, res: Response) => {
     const query = 'SELECT * FROM users';
-    executeQuery(query, [], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.json(result);
-        }
-    });
+    try {
+        const result = await executeQuery(query, []);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Update a user
-app.put('/users/:id', (req: Request, res: Response) => {
+app.put('/users/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { username, password, email, role } = req.body;
     const query = 'UPDATE users SET username = ?, password = ?, email = ?, role = ? WHERE id = ?';
-    executeQuery(query, [username, password, email, role, id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [username, password, email, role, id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Delete a user
-app.delete('/users/:id', (req: Request, res: Response) => {
+app.delete('/users/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const query = 'DELETE FROM users WHERE id = ?';
-    executeQuery(query, [id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Games
 
 // Create a new game
-app.post('/games', (req: Request, res: Response) => {
+app.post('/games', async (req: Request, res: Response) => {
     const { name, description } = req.body;
     const query = 'INSERT INTO games (name, description) VALUES (?, ?)';
-    executeQuery(query, [name, description], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.status(201).json({ id: result.insertId });
-        }
-    });
+    try {
+        const result = await executeQuery(query, [name, description]);
+        res.status(201).json({ id: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Get all games
-app.get('/games', (req: Request, res: Response) => {
+app.get('/games', async (req: Request, res: Response) => {
     const query = 'SELECT * FROM games';
-    executeQuery(query, [], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.json(result);
-        }
-    });
+    try {
+        const result = await executeQuery(query, []);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Update a game
-app.put('/games/:id', (req: Request, res: Response) => {
+app.put('/games/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, description } = req.body;
     const query = 'UPDATE games SET name = ?, description = ? WHERE id = ?';
-    executeQuery(query, [name, description, id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [name, description, id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Delete a game
-app.delete('/games/:id', (req: Request, res: Response) => {
+app.delete('/games/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const query = 'DELETE FROM games WHERE id = ?';
-    executeQuery(query, [id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Accounts
 
 // Create a new account
-app.post('/accounts', (req: Request, res: Response) => {
+app.post('/accounts', async (req: Request, res: Response) => {
     const { gameId, username, password, email, level, price } = req.body;
     const query = 'INSERT INTO accounts (game_id, username, password, email, level, price) VALUES (?, ?, ?, ?, ?, ?)';
-    executeQuery(query, [gameId, username, password, email, level, price], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.status(201).json({ id: result.insertId });
-        }
-    });
+    try {
+        const result = await executeQuery(query, [gameId, username, password, email, level, price]);
+        res.status(201).json({ id: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Get all accounts
-app.get('/accounts', (req: Request, res: Response) => {
+app.get('/accounts', async (req: Request, res: Response) => {
     const query = 'SELECT * FROM accounts';
-    executeQuery(query, [], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.json(result);
-        }
-    });
+    try {
+        const result = await executeQuery(query, []);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Update an account
-app.put('/accounts/:id', (req: Request, res: Response) => {
+app.put('/accounts/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { gameId, username, password, email, level, price, isSold } = req.body;
     const query = 'UPDATE accounts SET game_id = ?, username = ?, password = ?, email = ?, level = ?, price = ?, is_sold = ? WHERE id = ?';
-    executeQuery(query, [gameId, username, password, email, level, price, isSold, id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [gameId, username, password, email, level, price, isSold, id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Delete an account
-app.delete('/accounts/:id', (req: Request, res: Response) => {
+app.delete('/accounts/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const query = 'DELETE FROM accounts WHERE id = ?';
-    executeQuery(query, [id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Orders
 
 // Create a new order
-app.post('/orders', (req: Request, res: Response) => {
+app.post('/orders', async (req: Request, res: Response) => {
     const { accountId, userId, totalAmount } = req.body;
     const query = 'INSERT INTO orders (account_id, user_id, total_amount) VALUES (?, ?, ?)';
-    executeQuery(query, [accountId, userId, totalAmount], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.status(201).json({ id: result.insertId });
-        }
-    });
+    try {
+        const result = await executeQuery(query, [accountId, userId, totalAmount]);
+        res.status(201).json({ id: result.insertId });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Get all orders
-app.get('/orders', (req: Request, res: Response) => {
+app.get('/orders', async (req: Request, res: Response) => {
     const query = 'SELECT * FROM orders';
-    executeQuery(query, [], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.json(result);
-        }
-    });
+    try {
+        const result = await executeQuery(query, []);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Update an order
-app.put('/orders/:id', (req: Request, res: Response) => {
+app.put('/orders/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { accountId, userId, totalAmount } = req.body;
     const query = 'UPDATE orders SET account_id = ?, user_id = ?, total_amount = ? WHERE id = ?';
-    executeQuery(query, [accountId, userId, totalAmount, id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [accountId, userId, totalAmount, id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Delete an order
-app.delete('/orders/:id', (req: Request, res: Response) => {
+app.delete('/orders/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const query = 'DELETE FROM orders WHERE id = ?';
-    executeQuery(query, [id], (err, result) => {
-        if (err) {
-            res.status(500).json({ error: 'Internal server error' });
-        } else {
-            res.sendStatus(204);
-        }
-    });
+    try {
+        await executeQuery(query, [id]);
+        res.sendStatus(204);
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Start the server
